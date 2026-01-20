@@ -39,16 +39,17 @@ html,body{
   padding:10px;
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:6px;
   border-top:1px solid #222;
+  flex-wrap:wrap;
 }
 
 button{
   background:#111;
   color:#4cc3ff;
   border:1px solid #333;
-  padding:8px 12px;
-  font-size:16px;
+  padding:8px 10px;
+  font-size:15px;
   border-radius:4px;
 }
 
@@ -59,6 +60,7 @@ button{
 input[type="range"]{
   flex:1;
   height:40px;
+  min-width:120px;
 }
 
 input[type="file"]{
@@ -81,6 +83,11 @@ input[type="file"]{
 
     <button id="playBtn">▶</button>
 
+    <!-- New controls -->
+    <button id="speedBtn">2×</button>
+    <button id="backBtn">−1s</button>
+    <button id="forwardBtn">+1s</button>
+
     <button class="font-btn" id="fontDown">A−</button>
     <button class="font-btn" id="fontUp">A+</button>
 
@@ -94,14 +101,18 @@ input[type="file"]{
 let subtitles = [];
 let duration = 0;
 let playing = false;
-let startTimestamp = 0;
 let currentTime = 0;
 let rafId = null;
 let isSeeking = false;
 
+/* font */
 let fontSize = 42;
 const MIN_FONT = 18;
 const MAX_FONT = 96;
+
+/* playback speed */
+let playbackRate = 1;
+let lastFrameTime = 0;
 
 const display = document.getElementById("display");
 const fileInput = document.getElementById("fileInput");
@@ -110,6 +121,9 @@ const timeline = document.getElementById("timeline");
 const timeLabel = document.getElementById("timeLabel");
 const fontUpBtn = document.getElementById("fontUp");
 const fontDownBtn = document.getElementById("fontDown");
+const speedBtn = document.getElementById("speedBtn");
+const backBtn = document.getElementById("backBtn");
+const forwardBtn = document.getElementById("forwardBtn");
 
 function applyFontSize(){
   display.style.fontSize = fontSize + "px";
@@ -157,13 +171,14 @@ playBtn.onclick = ()=>{
   playing = !playing;
   playBtn.innerText = playing ? "⏸" : "▶";
   if(playing){
-    startTimestamp = performance.now() - currentTime*1000;
+    lastFrameTime = performance.now();
     loop();
   }else{
     cancelAnimationFrame(rafId);
   }
 };
 
+/* timeline seek */
 timeline.addEventListener("input", ()=>{
   isSeeking = true;
   currentTime = parseFloat(timeline.value);
@@ -173,10 +188,11 @@ timeline.addEventListener("input", ()=>{
 timeline.addEventListener("change", ()=>{
   isSeeking = false;
   if(playing){
-    startTimestamp = performance.now() - currentTime*1000;
+    lastFrameTime = performance.now();
   }
 });
 
+/* font size */
 fontUpBtn.onclick = ()=>{
   fontSize = Math.min(MAX_FONT, fontSize + 4);
   applyFontSize();
@@ -185,6 +201,26 @@ fontUpBtn.onclick = ()=>{
 fontDownBtn.onclick = ()=>{
   fontSize = Math.max(MIN_FONT, fontSize - 4);
   applyFontSize();
+};
+
+/* 2x speed toggle */
+speedBtn.onclick = ()=>{
+  playbackRate = playbackRate === 1 ? 2 : 1;
+  speedBtn.style.opacity = playbackRate === 2 ? "0.6" : "1";
+};
+
+/* jump -1s */
+backBtn.onclick = ()=>{
+  currentTime = Math.max(0, currentTime - 1);
+  lastFrameTime = performance.now();
+  updateDisplay(true);
+};
+
+/* jump +1s */
+forwardBtn.onclick = ()=>{
+  currentTime = Math.min(duration, currentTime + 1);
+  lastFrameTime = performance.now();
+  updateDisplay(true);
 };
 
 function updateDisplay(updateSlider=true){
@@ -200,10 +236,16 @@ function updateDisplay(updateSlider=true){
 
 function loop(){
   if(!playing) return;
-  const now = performance.now();
-  currentTime = (now - startTimestamp)/1000;
 
-  if(currentTime>=duration){
+  const now = performance.now();
+  if(!lastFrameTime) lastFrameTime = now;
+
+  const delta = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+
+  currentTime += delta * playbackRate;
+
+  if(currentTime >= duration){
     playing=false;
     playBtn.innerText="▶";
     return;
@@ -213,7 +255,7 @@ function loop(){
   rafId = requestAnimationFrame(loop);
 }
 
-/* Tap screen to play/pause */
+/* tap subtitle to play/pause */
 display.addEventListener("click", ()=>{
   playBtn.click();
 });
