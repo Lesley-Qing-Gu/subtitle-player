@@ -32,7 +32,6 @@ html,body{
   font-size:42px;
   line-height:1.4;
   user-select:none;
-  transition: opacity 0.15s;
 }
 
 #controls{
@@ -95,6 +94,7 @@ input[type="file"]{
 let subtitles = [];
 let duration = 0;
 let playing = false;
+let startTimestamp = 0;
 let currentTime = 0;
 let rafId = null;
 let isSeeking = false;
@@ -102,10 +102,6 @@ let isSeeking = false;
 let fontSize = 42;
 const MIN_FONT = 18;
 const MAX_FONT = 96;
-
-/* playback control */
-let playbackRate = 1;
-let lastFrameTime = 0;
 
 const display = document.getElementById("display");
 const fileInput = document.getElementById("fileInput");
@@ -161,7 +157,7 @@ playBtn.onclick = ()=>{
   playing = !playing;
   playBtn.innerText = playing ? "⏸" : "▶";
   if(playing){
-    lastFrameTime = performance.now();
+    startTimestamp = performance.now() - currentTime*1000;
     loop();
   }else{
     cancelAnimationFrame(rafId);
@@ -177,7 +173,7 @@ timeline.addEventListener("input", ()=>{
 timeline.addEventListener("change", ()=>{
   isSeeking = false;
   if(playing){
-    lastFrameTime = performance.now();
+    startTimestamp = performance.now() - currentTime*1000;
   }
 });
 
@@ -204,17 +200,11 @@ function updateDisplay(updateSlider=true){
 
 function loop(){
   if(!playing) return;
-
   const now = performance.now();
-  if(!lastFrameTime) lastFrameTime = now;
+  currentTime = (now - startTimestamp)/1000;
 
-  const delta = (now - lastFrameTime) / 1000;
-  lastFrameTime = now;
-
-  currentTime += delta * playbackRate;
-
-  if(currentTime >= duration){
-    playing = false;
+  if(currentTime>=duration){
+    playing=false;
     playBtn.innerText="▶";
     return;
   }
@@ -223,31 +213,10 @@ function loop(){
   rafId = requestAnimationFrame(loop);
 }
 
-/* tap to play / pause */
+/* Tap screen to play/pause */
 display.addEventListener("click", ()=>{
   playBtn.click();
 });
-
-/* long press = 2x speed */
-function setFastForward(on){
-  playbackRate = on ? 2 : 1;
-  display.style.opacity = on ? "0.75" : "1";
-}
-
-/* mobile */
-display.addEventListener("touchstart", e=>{
-  e.preventDefault();
-  if(playing) setFastForward(true);
-});
-display.addEventListener("touchend", ()=>setFastForward(false));
-display.addEventListener("touchcancel", ()=>setFastForward(false));
-
-/* desktop */
-display.addEventListener("mousedown", ()=>{
-  if(playing) setFastForward(true);
-});
-display.addEventListener("mouseup", ()=>setFastForward(false));
-display.addEventListener("mouseleave", ()=>setFastForward(false));
 
 applyFontSize();
 </script>
